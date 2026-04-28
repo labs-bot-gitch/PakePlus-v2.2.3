@@ -1,11 +1,605 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus</title>
-    </head>
-    <body>
-        Hello World
-    </body>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <title>灵动伴侣 · 拟人动态壁纸 | Toto</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0c12;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 手机壳容器 */
+        .phone {
+            width: 100%;
+            max-width: 400px;
+            height: 780px;
+            background: #0f111a;
+            border-radius: 48px;
+            box-shadow: 0 30px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 动态壁纸舞台 (全触控区) */
+        .stage {
+            flex: 1;
+            background: radial-gradient(circle at 30% 20%, #1a1e2c, #07090f);
+            position: relative;
+            overflow: hidden;
+            border-radius: 0 0 28px 28px;
+            margin: 8px 12px 0 12px;
+            cursor: pointer;
+            transition: box-shadow 0.2s;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+        }
+
+        /* 动态交互光晕/情绪效果层 */
+        .interaction-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 15;
+            border-radius: 28px;
+        }
+
+        .glow-effect {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(139,92,246,0.6), transparent);
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            filter: blur(18px);
+        }
+
+        /* 语音 / 对话气泡 */
+        .speech-bubble {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            right: 20px;
+            background: rgba(22, 26, 38, 0.85);
+            backdrop-filter: blur(20px);
+            border-radius: 32px;
+            padding: 12px 18px;
+            color: #f0eefc;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border-left: 3px solid #c084fc;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.4);
+            transform: translateY(100px);
+            transition: transform 0.3s cubic-bezier(0.34, 1.2, 0.64, 1);
+            z-index: 20;
+            pointer-events: none;
+            font-family: monospace;
+            letter-spacing: 0.3px;
+        }
+
+        .speech-bubble.show {
+            transform: translateY(0);
+        }
+
+        /* 底部控制栏 */
+        .control-bar {
+            background: rgba(18, 22, 32, 0.9);
+            backdrop-filter: blur(24px);
+            margin: 16px 16px 28px 16px;
+            border-radius: 36px;
+            padding: 14px 18px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .prompt-area {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .prompt-input {
+            flex: 1;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 40px;
+            padding: 10px 16px;
+            font-size: 0.8rem;
+            color: white;
+            font-family: inherit;
+            outline: none;
+        }
+
+        .prompt-input:focus {
+            border-color: #a78bfa;
+        }
+
+        .generate-btn {
+            background: linear-gradient(135deg, #8b5cf6, #c084fc);
+            border: none;
+            border-radius: 40px;
+            padding: 0 20px;
+            font-weight: bold;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: 0.1s linear;
+        }
+        .generate-btn:active { transform: scale(0.96);}
+
+        .model-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+            justify-content: space-between;
+        }
+        .model-chip {
+            flex: 1;
+            text-align: center;
+            padding: 6px 0;
+            border-radius: 30px;
+            background: #252a3a;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #b9c3e6;
+            transition: 0.1s;
+            cursor: pointer;
+        }
+        .model-chip.active {
+            background: #4c3b77;
+            color: white;
+            box-shadow: 0 0 0 1px #a78bfa;
+        }
+
+        .action-group {
+            display: flex;
+            gap: 12px;
+        }
+        .action-btn {
+            flex: 1;
+            background: #1e2230;
+            border: none;
+            padding: 8px 0;
+            border-radius: 28px;
+            color: #ccd6f0;
+            font-size: 0.7rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        .action-btn:active { background: #5b4b8c; color: white;}
+
+        .credit {
+            font-size: 0.6rem;
+            text-align: center;
+            margin-top: 12px;
+            color: #5b6e8c;
+        }
+
+        /* 动态浮动名字 */
+        .name-tag {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(12px);
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #e9d5ff;
+            letter-spacing: 1px;
+            z-index: 12;
+            pointer-events: none;
+            border: 0.5px solid #c084fc;
+        }
+
+        /* 交互波纹反馈 */
+        @keyframes ripple {
+            to { transform: scale(4); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+<div class="phone">
+    <div class="stage" id="touchStage">
+        <canvas id="wallpaperCanvas" width="720" height="1280"></canvas>
+        <div class="interaction-overlay" id="interactionFX"></div>
+        <div class="name-tag" id="nameTag">✨ toto ✨</div>
+        <div class="speech-bubble" id="speechBubble">👋 轻轻碰我，我会回应你~</div>
+    </div>
+
+    <div class="control-bar">
+        <div class="prompt-area">
+            <input type="text" id="promptInput" class="prompt-input" placeholder="说描述: 梦幻花海拟人少女, 星空裙摆..." value="温柔拟人小猫娘, 水晶花冠, 梦幻琉璃光">
+            <button id="generateBtn" class="generate-btn"><i class="fas fa-feather-alt"></i> 生成</button>
+        </div>
+        <div class="model-row" id="modelSelect">
+            <div class="model-chip" data-model="qwen">通义</div>
+            <div class="model-chip active" data-model="glm">智谱</div>
+            <div class="model-chip" data-model="ernie">文心</div>
+            <div class="model-chip" data-model="deepseek">DeepSeek</div>
+        </div>
+        <div class="action-group">
+            <button id="randomBtn" class="action-btn"><i class="fas fa-dice"></i> 随机灵感</button>
+            <button id="renameBtn" class="action-btn"><i class="fas fa-pen"></i> 唤名·改名</button>
+            <button id="saveBtn" class="action-btn"><i class="fas fa-save"></i> 保存壁纸</button>
+        </div>
+        <div class="credit">💬 喊我名字「toto」或者你取的新名字 · 触碰会开心回应 ✨</div>
+    </div>
+</div>
+
+<script>
+    // ======================== 拟人动态壁纸核心 ========================
+    // 角色名：初始 Toto，可更改
+    let charName = "toto";
+    let displayName = "toto";
+    let isListening = false;
+    let currentWallpaperImage = null;   // 存储生成的图像数据 (Image 对象)
+    let animationFrameId = null;
+    let canvas = document.getElementById('wallpaperCanvas');
+    let ctx = canvas.getContext('2d');
+    let stageDiv = document.getElementById('touchStage');
+    let speechDiv = document.getElementById('speechBubble');
+    let nameTagSpan = document.getElementById('nameTag');
+    let currentModel = 'glm';
+    
+    // 交互特效数据: 鼠标/触摸涟漪位置 + 情绪微动
+    let touchPoints = [];        // 存储 {x,y, life}
+    let ambientTilt = { x: 0, y: 0 };  // 模拟动态微交互
+    
+    // 语音识别相关 (Web Speech API)
+    let recognition = null;
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'zh-CN';
+    }
+    
+    // 对话历史/情绪 简单队列
+    let lastReaction = 0;
+    
+    // 展示气泡消息，自动淡出
+    function showBubbleMessage(msg, emotion = 'neutral', duration = 2800) {
+        speechDiv.innerText = msg;
+        speechDiv.classList.add('show');
+        if (animationFrameId) clearTimeout(window.bubbleTimeout);
+        window.bubbleTimeout = setTimeout(() => {
+            speechDiv.classList.remove('show');
+        }, duration);
+        // 附加情绪小特效: 屏幕微闪
+        if(emotion === 'happy') {
+            const flash = document.createElement('div');
+            flash.style.position = 'absolute'; flash.style.inset = '0'; flash.style.background = 'radial-gradient(circle, rgba(210,150,250,0.25), transparent)';
+            flash.style.pointerEvents = 'none'; flash.style.zIndex = '14';
+            document.querySelector('.stage').appendChild(flash);
+            setTimeout(() => flash.remove(), 400);
+        } else if (emotion === 'excited') {
+            for(let i=0;i<3;i++) createFireflyEffect();
+        }
+    }
+    
+    // 创建小光点特效(萤火)
+    function createFireflyEffect() {
+        let stage = document.querySelector('.stage');
+        let div = document.createElement('div');
+        div.style.position = 'absolute';
+        div.style.width = '8px'; div.style.height = '8px';
+        div.style.borderRadius = '50%';
+        div.style.background = '#f0c0ff';
+        div.style.boxShadow = '0 0 12px #c084fc';
+        div.style.left = Math.random() * 90 + '%';
+        div.style.bottom = '20%';
+        div.style.pointerEvents = 'none';
+        div.style.zIndex = '16';
+        div.style.opacity = '0.8';
+        stage.appendChild(div);
+        let anim = div.animate([{ transform: 'translateY(0) scale(1)', opacity: 0.8 }, { transform: 'translateY(-80px) scale(0.3)', opacity: 0 }], 800);
+        anim.onfinish = () => div.remove();
+    }
+    
+    // 触碰涟漪
+    function addRipple(x, y) {
+        const fxDiv = document.createElement('div');
+        fxDiv.className = 'glow-effect';
+        fxDiv.style.left = x + 'px';
+        fxDiv.style.top = y + 'px';
+        fxDiv.style.opacity = '0.7';
+        fxDiv.style.animation = 'ripple 0.6s ease-out';
+        document.getElementById('interactionFX').appendChild(fxDiv);
+        setTimeout(() => fxDiv.remove(), 600);
+        // 增加触碰互动: 角色开心反应
+        const randomMsg = [`😊 呀~ 好温柔`, `💜 ${displayName} 在呢`, `🌸 喜欢和你玩`, `✨ 再摸摸我嘛`, `🍃 呼~ 好舒服`];
+        const idx = Math.floor(Math.random() * randomMsg.length);
+        showBubbleMessage(randomMsg[idx], 'happy', 1600);
+        // 同时触发动效微移
+        ambientTilt.x = (Math.random() - 0.5) * 4;
+        ambientTilt.y = (Math.random() - 0.5) * 4;
+        setTimeout(() => { ambientTilt.x *= 0.5; ambientTilt.y *= 0.5; }, 300);
+    }
+    
+    // 语音唤醒 / 喊名字
+    function startVoiceWakeup() {
+        if (!recognition) {
+            showBubbleMessage("⚠️ 浏览器不支持语音唤醒，试试手动改名或触碰~", 'neutral');
+            return;
+        }
+        if (isListening) {
+            recognition.stop();
+            isListening = false;
+            return;
+        }
+        try {
+            recognition.start();
+            isListening = true;
+            showBubbleMessage(`🎤 我在听，喊“${displayName}”试试～`, 'neutral', 2000);
+            recognition.onresult = (event) => {
+                let transcript = event.results[0][0].transcript.toLowerCase();
+                console.log("语音识别:", transcript);
+                // 检查是否包含当前角色名字 (支持中文或英文名)
+                let nameLower = displayName.toLowerCase();
+                if (transcript.includes(nameLower) || (displayName === "toto" && transcript.includes("toto")) || transcript.includes("托托") || transcript.includes("偷偷")) {
+                    showBubbleMessage(`🎶 我在呢！${displayName} 听到你啦～ 好开心 ❤️`, 'excited', 2000);
+                    // 特殊动画: 闪烁心跳效果
+                    for(let i=0;i<5;i++) createFireflyEffect();
+                    // 响应后自动停止监听几秒避免频繁唤醒
+                    recognition.stop();
+                    isListening = false;
+                    setTimeout(() => { if(!isListening) showBubbleMessage(`💤 可以再喊我名字唤醒哦~`, 'neutral', 1800); }, 3000);
+                } else {
+                    showBubbleMessage(`❓ 没有听到“${displayName}”呢……再喊一次吧~`, 'neutral', 1600);
+                    recognition.stop();
+                    isListening = false;
+                }
+            };
+            recognition.onerror = (e) => {
+                console.warn(e);
+                isListening = false;
+                showBubbleMessage(`🎙️ 没听清楚，你可以触碰屏幕或手动改名~`, 'neutral', 1500);
+            };
+            recognition.onend = () => { isListening = false; };
+        } catch(e) { showBubbleMessage("语音启动失败，请刷新页面授权麦克风","neutral"); }
+    }
+    
+    // 改名功能
+    function renameCharacter() {
+        let newName = prompt(`✨ 给壁纸中的拟人精灵取个新名字吧 (当前: ${displayName})`, displayName);
+        if(newName && newName.trim() !== "") {
+            let clean = newName.trim().slice(0, 16);
+            displayName = clean;
+            charName = clean;
+            nameTagSpan.innerHTML = `✨ ${displayName} ✨`;
+            showBubbleMessage(`🎉 新名字「${displayName}」！以后喊我我就会回应你~ 🥰`, 'happy', 2500);
+            // 更新语音热词
+        } else if (newName === "") {
+            showBubbleMessage("名字不能为空哦，还是叫我原来的名字吧~", 'neutral');
+        }
+    }
+    
+    // ------------------- AI 生成壁纸 (调用Pollinations 模拟大模型，增加拟人动态细节)--------------------
+    async function generateWallpaperFromAI(prompt, modelId) {
+        showBubbleMessage(`✨ ${displayName} 正在用 ${modelId.toUpperCase()} 绘制新衣装... ✨`, 'neutral', 1800);
+        const overlay = document.createElement('div');
+        overlay.style.position = 'absolute'; overlay.style.inset = '0'; overlay.style.background = 'rgba(0,0,0,0.45)'; overlay.style.backdropFilter = 'blur(6px)'; overlay.style.zIndex = '25'; overlay.style.display = 'flex'; overlay.style.alignItems = 'center'; overlay.style.justifyContent = 'center';
+        overlay.innerHTML = `<div style="background:#1e1a2f; padding:12px 24px; border-radius: 40px; font-weight:bold;">🎨 大模型创作中... ${modelId}</div>`;
+        document.querySelector('.stage').appendChild(overlay);
+        
+        return new Promise(async (resolve) => {
+            try {
+                let finalPrompt = `${prompt}, anthropomorphic character, cute wall art, digital painting, magical atmosphere, 9:21 wallpapers, beautiful face, kawaii, glowing details`;
+                if (modelId === 'qwen') finalPrompt += ", soft fantasy, ghibli style, warm lighting";
+                else if (modelId === 'glm') finalPrompt += ", vibrant anime, crystal clear, lovely eyes";
+                else if (modelId === 'ernie') finalPrompt += ", elegant ink wash, ethereal dreamlike";
+                else finalPrompt += ", cyber sparkles, magical girl";
+                const encoded = encodeURIComponent(finalPrompt);
+                const seed = Date.now() + Math.floor(Math.random() * 10000);
+                const imgUrl = `https://image.pollinations.ai/prompt/${encoded}?seed=${seed}&width=720&height=1280&nologo=true`;
+                
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                img.onload = () => {
+                    currentWallpaperImage = img;
+                    drawWallpaperWithInteraction();
+                    overlay.remove();
+                    showBubbleMessage(`🎀 新壁纸好美！我是${displayName}，快摸摸我或者喊名字吧~`, 'happy', 2800);
+                    resolve(img);
+                };
+                img.onerror = () => {
+                    // 降级 更稳定图片
+                    const fallback = `https://picsum.photos/id/${Math.floor(Math.random()*100)+1}/720/1280?grayscale&seed=${seed}`;
+                    const fallImg = new Image();
+                    fallImg.onload = () => { currentWallpaperImage = fallImg; drawWallpaperWithInteraction(); overlay.remove(); showBubbleMessage("✨ 网络波动，但精灵依旧漂亮 ✨",'neutral',1500); resolve(fallImg); };
+                    fallImg.src = fallback;
+                };
+                img.src = imgUrl;
+            } catch(e) { overlay.remove(); resolve(null); }
+        });
+    }
+    
+    // 画壁纸 + 叠加拟人动态: 根据触摸/名字呼吸光效 + 眼睛眨动微表情 （动态拟人效果）
+    function drawWallpaperWithInteraction() {
+        if (!currentWallpaperImage) return;
+        if (!ctx) return;
+        const w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(currentWallpaperImage, 0, 0, w, h);
+        
+        // 动态叠加可爱光晕 (触摸涟漪残影效果)
+        let now = Date.now() / 300;
+        for(let i=0; i<touchPoints.length; i++) {
+            let p = touchPoints[i];
+            let alpha = Math.max(0, 1 - p.life);
+            ctx.save();
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 20 * (1-p.life) + 5, 0, Math.PI*2);
+            ctx.fillStyle = `rgba(200, 150, 255, ${0.3 * (1-p.life)})`;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 8 * (1-p.life) + 2, 0, Math.PI*2);
+            ctx.fillStyle = `rgba(240, 200, 255, ${0.5 * (1-p.life)})`;
+            ctx.fill();
+            ctx.restore();
+            p.life -= 0.03;
+        }
+        touchPoints = touchPoints.filter(p => p.life > 0);
+        
+        // 模拟动态拟人呼吸：眼睛高光/腮红 利用坐标(因为壁纸内容不定，在画面右下角加可爱漂浮小星星)
+        ctx.font = "bold 24px 'Segoe UI Emoji'";
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "#f0a0ff";
+        // 拟人动态: 随着触摸时候名字飘浮粒子
+        let time = Date.now() / 500;
+        let floatY = Math.sin(time) * 3;
+        ctx.fillStyle = "rgba(255,245,210,0.85)";
+        ctx.font = "italic 20px 'Inter'";
+        ctx.shadowBlur = 12;
+        ctx.fillText(`❤️ ${displayName} ❤️`, w-140, 70 + floatY);
+        // 加上可爱互动图标 (随机表情 根据最近反应)
+        let moodEmoji = "🌸";
+        if(lastReaction > Date.now() - 2000) moodEmoji = "🥰";
+        ctx.font = "36px 'Segoe UI Emoji'";
+        ctx.fillStyle = "white";
+        ctx.shadowBlur = 16;
+        ctx.fillText(moodEmoji, w-60, h-40);
+        
+        // 环境扰动（模拟风吹或者开心的飘移）
+        ctx.beginPath();
+        for(let i=0;i<12;i++) {
+            let xOff = (Math.sin(time + i)*10) + w*0.8;
+            let yOff = (Math.cos(time*0.7 + i)*8) + h*0.2;
+            ctx.fillStyle = `rgba(220,180,255,0.4)`;
+            ctx.arc(xOff, yOff, 2, 0, Math.PI*2);
+            ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+        animationFrameId = requestAnimationFrame(() => drawWallpaperWithInteraction());
+    }
+    
+    // 处理触摸/鼠标事件 (触碰式反馈)
+    function handleStageTouch(e) {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        let clientX, clientY;
+        if(e.touches) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        let canvasX = (clientX - rect.left) * scaleX;
+        let canvasY = (clientY - rect.top) * scaleY;
+        canvasX = Math.min(canvas.width, Math.max(0, canvasX));
+        canvasY = Math.min(canvas.height, Math.max(0, canvasY));
+        touchPoints.push({ x: canvasX, y: canvasY, life: 1.0 });
+        addRipple(clientX - rect.left, clientY - rect.top);
+        // 每次触碰增加感情亲密度，更改待机表情
+        lastReaction = Date.now();
+    }
+    
+    // 生成主控
+    async function onGenerate() {
+        let prompt = promptInput.value.trim();
+        if(!prompt) prompt = "梦幻魔法少女, 星辰发饰, 拟人化小精灵";
+        await generateWallpaperFromAI(prompt, currentModel);
+    }
+    
+    // 随机灵感填充
+    function randomPrompt() {
+        const ideas = ["樱花树下的狐耳少女，笑眼盈盈", "水晶蝴蝶拟人，流光羽翼，星空背景", "阳光开朗的柴犬少年，戴围巾", "月亮女神拟人，银发，圣洁光辉", "蒸汽朋克猫咪机械师，可爱齿轮", "水母精灵，透明触手，深海魔法"];
+        promptInput.value = ideas[Math.floor(Math.random() * ideas.length)];
+        showBubbleMessage(`✨ 试试这个描述生成${displayName}的新衣吧~`, 'neutral', 1200);
+    }
+    
+    // 保存壁纸 (截图含动态绘制层)
+    function saveWallpaper() {
+        try {
+            const canvasToSave = canvas;
+            const link = document.createElement('a');
+            link.download = `dynamic_${displayName}_wallpaper.png`;
+            link.href = canvasToSave.toDataURL('image/png');
+            link.click();
+            showBubbleMessage(`📸 壁纸已保存，${displayName} 会一直陪着你~`, 'happy', 2000);
+        } catch(e) { showBubbleMessage("保存失败，长按图片试试", 'neutral'); }
+    }
+    
+    // 模型切换
+    function initModelChips() {
+        document.querySelectorAll('.model-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.model-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                currentModel = chip.getAttribute('data-model');
+                showBubbleMessage(`🧠 切换模型: ${chip.innerText}  下次绘制风格会不同哦`, 'neutral', 1500);
+            });
+        });
+    }
+    
+    // 监听语音按钮 可以通过喊名字动作：额外增加长按改名区调用语音唤醒
+    function bindEvents() {
+        const stage = document.getElementById('touchStage');
+        stage.addEventListener('touchstart', handleStageTouch);
+        stage.addEventListener('mousedown', handleStageTouch);
+        document.getElementById('generateBtn').addEventListener('click', onGenerate);
+        document.getElementById('randomBtn').addEventListener('click', randomPrompt);
+        document.getElementById('renameBtn').addEventListener('click', renameCharacter);
+        document.getElementById('saveBtn').addEventListener('click', saveWallpaper);
+        // 语音唤醒循环： 每隔几秒自动开启？但最好用户主动开启，改为：点击顶部名字标签可以开启语音监听
+        nameTagSpan.addEventListener('click', () => startVoiceWakeup());
+        // 额外: 在控制条区域加隐形双击唤醒提示
+        const creditDiv = document.querySelector('.credit');
+        creditDiv.addEventListener('dblclick', () => startVoiceWakeup());
+        showBubbleMessage(`🎤 双击底部文字或点击我的名字「${displayName}」即可语音唤醒我哦`, 'neutral', 4000);
+    }
+    
+    // 初始化壁纸和首张AI拟人壁纸
+    async function initApp() {
+        initModelChips();
+        bindEvents();
+        // 开场生成默认壁纸：让toto 初次见面
+        await generateWallpaperFromAI("可爱拟人精灵少女，水晶翅膀，花园精灵，闪闪发光", currentModel);
+        showBubbleMessage(`🐾 我叫${displayName}！碰碰屏幕或者喊我名字（需要麦克风授权），我会开心回应你喔~`, 'happy', 4000);
+        // 动态绘制循环启动
+        drawWallpaperWithInteraction();
+    }
+    
+    initApp();
+</script>
+</body>
 </html>
